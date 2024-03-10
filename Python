@@ -1,0 +1,92 @@
+import cv2 as cv 
+import numpy as np
+
+#충청남도 천안시 동남구 안서동 506-5 에있는 상명대 입구 삼거리 
+#cctv006
+#출처 : https://www.data.go.kr/data/15063717/fileData.do
+video_file = 'http://210.99.70.120:1935/live/cctv005.stream/playlist.m3u8'
+
+video =  cv.VideoCapture(video_file)
+
+
+#영상저장용 
+
+
+target_format = 'avi'
+target_fourcc = 'XVID'
+capture_valid = False
+
+#움직이는물체 확인용
+moving_filter = False
+
+
+if video.isOpened() :
+    #영상저장용
+    target = cv.VideoWriter()
+    
+    
+    #동영상 속도조절용
+    fps = video.get (cv.CAP_PROP_FPS )
+    wait_msec = int(1 / fps * 1000)
+    
+    
+    #움직이는 물체만 빼내기 위한 변수
+    img_prev = None
+    
+    
+    #루프 돌릴 친구
+    while True :
+        valid, img = video.read()
+        
+        #영상 없을때 종료
+        if not valid : break
+        
+        
+        #움직이는 물체 확인용 변수 설정
+        if img_prev is None :
+            img_prev = img.copy()
+            continue
+        img_diff = np.abs(img.astype(np.int32) - img_prev).astype(np.uint8)
+        img_prev = img.copy()
+        
+        if moving_filter :
+            img = img_diff
+        
+        #영상저장이 활성화 된경우
+        if capture_valid :
+            h,w, *_ = img.shape
+            pt1, pt2 = (0, 0), (w, h)
+            cv.rectangle(img, pt1, pt2, color = (0, 0, 255), thickness = 5)
+            
+            if not target.isOpened() :
+                target_file = 'recordvideo' + '.' + target_format
+                is_color = (img.ndim > 2) and (img.shape[2] > 1)
+                target.open(target_file, cv.VideoWriter_fourcc(*target_fourcc), fps, (w, h), is_color)
+            
+            target.write(img)
+        
+        
+        cv.imshow('video_player', img)
+        
+        key = cv.waitKey(wait_msec)
+        
+        #일시정지 p
+        if key == ord('p') or key == ord('P') :
+            key = cv.waitKey()
+        
+        #영상저장할 때 space bar
+        if key == ord(' ') :
+            capture_valid = True if capture_valid is False else False
+        
+        #움직이는물체 필터
+        if key == ord('r') or key == ord('R') :
+            moving_filter = True if moving_filter is False else False
+        
+        
+        #종료키
+        if key == 27 : #'ECS'를 의미
+            break
+    
+    target.release()
+    cv.destroyAllWindows()
+    
